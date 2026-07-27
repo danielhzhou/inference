@@ -11,6 +11,7 @@ learning_rate = 3e-4
 device = 'mps'
 eval_iters = 200
 n_embd = 384
+# turns a random set of nodes within the model off each iter to reduce overfitting
 dropout = 0.2
 # ----------------------
 
