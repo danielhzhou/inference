@@ -66,11 +66,15 @@ class Block(nn.Module):
         head_size = n_embd // n_head
         self.sa = MultiHeadAttention(n_head, head_size)
         self.ffwd = FeedForward(n_embd)
+        self.ln1 = nn.LayerNorm(n_embd) # mean = 0, var = 1 for each token
+        self.ln2 = nn.LayerNorm(n_embd)
+
+
 
     def forward(self, x):
         # residual paths
-        x = x + self.sa(x)
-        x = x + self.ffwd(x)
+        x = x + self.sa(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
         return x
 
 class GPTLanguageModel(nn.module):
