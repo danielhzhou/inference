@@ -79,7 +79,7 @@ class Head(nn.Module):
         q = self.query(x)
 
         wei = q @ k.transpose(-2, -1) * k.shape[-1]**-0.5
-        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('inf'))
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))
         wei = F.softmax(wei, dim=-1)
         wei = self.dropout(wei)
 
@@ -93,7 +93,7 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, num_heads, head_size):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
-        self.proj == nn.Linear(head_size * num_heads, n_embd)
+        self.proj = nn.Linear(head_size * num_heads, n_embd)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -102,13 +102,13 @@ class MultiHeadAttention(nn.Module):
         return out
 
 class FeedForward(nn.Module):
-    def __init__(self):
+    def __init__(self, n_embd):
         super().__init__()
         self.net = nn.Sequential(
             # 4 is specified by attention is all you need, expand learning size
-            nn.linear(n_embd, 4 * n_embd),
+            nn.Linear(n_embd, 4 * n_embd),
             nn.ReLU(), # turns negative numbers -> 0
-            nn.linear(n_embd * 4, n_embd),
+            nn.Linear(n_embd * 4, n_embd),
             nn.Dropout(dropout)
         )
     # on a per token level
@@ -132,10 +132,10 @@ class Block(nn.Module):
         x = x + self.ffwd(self.ln2(x))
         return x
 
-class GPTLanguageModel(nn.module):
+class GPTLanguageModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.token_embed_table = nn.Embedding(vocab_size, n_embd)
+        self.token_embd_table = nn.Embedding(vocab_size, n_embd)
         self.pos_embd_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd)
