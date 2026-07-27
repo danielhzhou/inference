@@ -148,6 +148,8 @@ class GPTLanguageModel(nn.Module):
         pos_emb = self.pos_embd_table(torch.arange(T, device=device))
 
         x = tok_emb + pos_emb
+        x = self.blocks(x)
+        x = self.ln_f(x)
         logits = self.lm_head(x)
 
         if targets is None:
