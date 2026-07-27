@@ -11,6 +11,7 @@ learning_rate = 3e-4
 device = 'mps'
 eval_iters = 200
 n_embd = 384
+dropout = 0.2
 # ----------------------
 
 torch.manual_seed(1337)
@@ -23,6 +24,8 @@ class Head(nn.Module):
         self.value = nn.Linear(n_embd, head_size)
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
 
+        self.dropout = nn.Dropout(dropout)
+
     def forward(self, x):
         B,T,C = x.shape
 
@@ -32,6 +35,7 @@ class Head(nn.Module):
         wei = q @ k.transpose(-2, -1) * k.shape[-1]**-0.5
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('inf'))
         wei = F.softmax(wei, dim=-1)
+        wei = self.dropout(wei)
 
         v = self.value(x)
         out = wei @ v
@@ -43,16 +47,23 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, num_heads, head_size):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
+        self.proj == nn.Linear(head_size * num_heads, n_embd)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        return torch.cat([h(x) for h in self.heads], dim=-1)
+        out = torch.cat([h(x) for h in self.heads], dim=-1)
+        out = self.dropout(self.proj(out))
+        return out
 
 class FeedForward(nn.Module):
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(
-            nn.linear(n_embd, n_embd),
-            nn.ReLU() # turns negative numbers -> 0
+            # 4 is specified by attention is all you need, expand learning size
+            nn.linear(n_embd, 4 * n_embd),
+            nn.ReLU(), # turns negative numbers -> 0
+            nn.linear(n_embd * 4, n_embd),
+            nn.Dropout(dropout)
         )
     # on a per token level
     # this is the computation after the communication (attention)
@@ -69,11 +80,9 @@ class Block(nn.Module):
         self.ln1 = nn.LayerNorm(n_embd) # mean = 0, var = 1 for each token
         self.ln2 = nn.LayerNorm(n_embd)
 
-
-
     def forward(self, x):
         # residual paths
-        x = x + self.sa(self.ln1(x))
+        x = x + self.sa(self.ln1(x)) # pre norm
         x = x + self.ffwd(self.ln2(x))
         return x
 
