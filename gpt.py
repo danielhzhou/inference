@@ -47,3 +47,31 @@ class MultiHeadAttention(nn.Module):
     def forward(self, x):
         return torch.cat([h(x) for h in self.heads], dim=-1)
 
+class FeedForward(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.linear(n_embd, n_embd),
+            nn.ReLU() # turns negative numbers -> 0
+        )
+    # on a per token level
+    # this is the computation after the communication (attention)
+    def forward(self, x):
+        return self.net(x)
+
+# an attention block
+class Block(nn.Module):
+    def __init__(self, n_embd, n_head):
+        super().__init__()
+        head_size = n_embd // n_head
+        self.sa = MultiHeadAttention(n_head, head_size)
+        self.ffwd = FeedForward(n_embd)
+
+    def forward(self, x):
+        x = self.sa(x)
+        x = self.ffwd(x)
+        return x
+
+class GPTLanguageModel(nn.module):
+    def __init__(self):
+        super().__init__()
