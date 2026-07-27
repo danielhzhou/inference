@@ -13,7 +13,7 @@ eval_iters = 200
 n_embd = 384
 n_head = 6
 n_layer = 6
-# turns a random set of nodes within the model off each iter to reduce overfitting
+# turns a random set of nodes within the model off (drops to zero) each iter to reduce overfitting
 dropout = 0.2
 # ----------------------
 
