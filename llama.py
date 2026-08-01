@@ -82,10 +82,10 @@ class FeedForward(nn.Module):
         self.w3 = nn.Linear(n_embd, hidden_dim, bias=False)
 
     def forward(self, x):
-        temp = F.silu(self.w1(x))
+        gate = F.silu(self.w1(x))
         values = self.w3(x)
 
-        return self.w2(temp * values)
+        return self.w2(gate * values)
 
 class AttentionBlock(nn.Module):
     def __init__(self):
