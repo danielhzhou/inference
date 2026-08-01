@@ -87,13 +87,20 @@ class FeedForward(nn.Module):
 
         return self.w2(gate * values)
 
+# transformer block
 class AttentionBlock(nn.Module):
     def __init__(self):
         super().__init__()
 
+        self.mah = Attention()
+        self.ffwd = FeedForward()
+        self.ln1 = RMSNorm()
+        self.ln2 = RMSNorm()
 
-
-
+    def forward(self, x):
+        x = x + self.mah(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
+        return x
 
 
 # model = Transformer()
