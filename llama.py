@@ -26,8 +26,13 @@ class RMSNorm(nn.Module):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(n_embd))
 
+    def norm(self, x):
+        return x * torch.sqrt(x.pow(2).mean(-1, keepdim=True) + eps)
+
     def forward(self, x):
-        x * torch.sqrt(x.pow(2).mean(-1, keepdim=True) + eps)
+        output = self.norm(x.float()).type_as(x)
+        return output * self.weight
+    
 
 class Attention(nn.Module):
     def __init__(self):
