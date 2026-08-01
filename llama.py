@@ -15,18 +15,13 @@ n_layers = config["n_layers"]
 eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
 
-
-class Transformer(nn.Module):
-    def __init__(self):
-        super().__init__()
-
 class RMSNorm(nn.Module):
     def __init__(self):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(n_embd))
 
     def norm(self, x):
-        return x * torch.sqrt(x.pow(2).mean(-1, keepdim=True) + eps)
+        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + eps)
 
     def forward(self, x):
         output = self.norm(x.float()).type_as(x)
@@ -74,7 +69,7 @@ class Attention(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self):
         super().__init__()
-        hidden_dim = n_embd * 8 / 3
+        hidden_dim = int(n_embd * 8 / 3)
         hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
 
         self.w1 = nn.Linear(n_embd, hidden_dim, bias=False)
@@ -101,6 +96,11 @@ class AttentionBlock(nn.Module):
         x = x + self.mah(self.ln1(x))
         x = x + self.ffwd(self.ln2(x))
         return x
+
+class Transformer(nn.Module):
+    def __init__(self):
+        super().__init__()
+
 
 
 # model = Transformer()
