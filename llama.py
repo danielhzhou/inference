@@ -21,6 +21,14 @@ class Transformer(nn.Module):
     def __init__(self):
         super().__init__()
 
+class RMSNorm(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(n_embd))
+
+    def forward(self, x):
+        x * torch.sqrt(x.pow(2).mean(-1, keepdim=True) + eps)
+
 class Attention(nn.Module):
     def __init__(self):
         super().__init__()
@@ -58,7 +66,6 @@ class Attention(nn.Module):
         out = self.wo(out)
 
         return out
-
 
 
 # model = Transformer()
