@@ -6,8 +6,6 @@ import json
 with open("./llama-2-7b/params.json", "r") as f:
     config = json.load(f)
 
-
-
 # hyperparams
 block_size = 4096 # i think this is typical for Llama 2 7B
 n_embd = config["dim"]
@@ -15,6 +13,7 @@ n_head = config["n_heads"]
 head_size = n_embd // n_head
 n_layers = config["n_layers"]
 eps = config["norm_eps"]
+multiple_of = config["multiple_of"]
 
 
 class Transformer(nn.Module):
@@ -71,6 +70,30 @@ class Attention(nn.Module):
         out = self.wo(out)
 
         return out
+
+class FeedForward(nn.Module):
+    def __init__(self):
+        super().__init__()
+        hidden_dim = n_embd * 8 / 3
+        hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
+
+        self.w1 = nn.Linear(n_embd, hidden_dim, bias=False)
+        self.w2 = nn.Linear(hidden_dim, n_embd, bias=False)
+        self.w3 = nn.Linear(n_embd, hidden_dim, bias=False)
+
+    def forward(self, x):
+        temp = F.silu(self.w1(x))
+        values = self.w3(x)
+
+        return self.w2(temp * values)
+
+class AttentionBlock(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+
+
+
 
 
 # model = Transformer()
