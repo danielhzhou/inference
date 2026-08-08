@@ -25,7 +25,7 @@ def precompute_complex_exponential_freqs(n_embd, end, theta = 10000.0):
     
     """
     # calc rotation freq, make sure n_embd is even
-    freqs = 1.0 / (theta ** (torch.arrange(0, n_embd, 2).float() / n_embd)) 
+    freqs = 1.0 / (theta ** (torch.arange(0, n_embd, 2).float() / n_embd)) 
     # array of positions
     t_pos = torch.arange(end, device=freqs.device) 
     # pos x freq
@@ -39,9 +39,9 @@ def reshape_for_broadcast(freqs_cis, x):
     shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)]
     return freqs_cis.view(*shape)
 
-def apply_rope(query, key freqs_cis):
+def apply_rope(query, key, freqs_cis):
     q = torch.view_as_complex(query.float().reshape(*query.shape[:-1], -1, 2))
-    k = torch.view_as_complex(key.float().reshape(*key.shape[:-1][-1], -1, 2))
+    k = torch.view_as_complex(key.float().reshape(*key.shape[:-1], -1, 2))
     # allow pytorch to broadcast the tensor
     freqs_cis = reshape_for_broadcast(freqs_cis, q) 
     # perform rotation
