@@ -15,6 +15,7 @@ n_layers = config["n_layers"]
 eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
 
+
 def precompute_complex_exponential_freqs(n_head, end, theta = 10000.0):
     """
     end = end index
@@ -130,6 +131,7 @@ class AttentionBlock(nn.Module):
         self.ln2 = RMSNorm()
 
     def forward(self, x):
+        # residual connections
         x = x + self.mah(self.ln1(x))
         x = x + self.ffwd(self.ln2(x))
         return x
