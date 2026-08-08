@@ -73,7 +73,7 @@ class Attention(nn.Module):
 
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
         
-    def forward(self, x):
+    def forward(self, x, freqs_cis):
         B, T, C = x.shape
 
         q = self.wq(x) # (B, T, 4096)
@@ -84,6 +84,8 @@ class Attention(nn.Module):
         query = q.view(B, T, n_head, head_size) # (B, T, 32, 128)
         key = k.view(B, T, n_head, head_size)
         value = v.view(B, T, n_head, head_size)
+
+        query, key = apply_rope(query, key, freqs_cis=freqs_cis)
 
         query = query.transpose(1, 2) # (B, 32, T, 128)
         key = key.transpose(1, 2)
