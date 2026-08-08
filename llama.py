@@ -15,6 +15,41 @@ n_layers = config["n_layers"]
 eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
 
+def precompute_complex_exponential_freqs(n_embd, end, theta = 10000.0):
+    """
+    end = end index
+    theta = scaling factor for frequency computation
+    split tensor into groups of 2 to perform rotations
+    return in complex64 datatype
+    a + ib = r(cos(theta) + isin(theta))
+    
+    """
+    # calc rotation freq, make sure n_embd is even
+    freqs = 1.0 / (theta ** (torch.arrange(0, n_embd, 2).float() / n_embd)) 
+    # array of positions
+    t_pos = torch.arange(end, device=freqs.device) 
+    # pos x freq
+    freqs = torch.outer(t_pos, freqs).float()
+    freqs_cis = torch.polar(torch.ones_like(freqs), freqs) # complex num for rotation
+    return freqs_cis
+
+# allow pytorch broadcasts
+def reshape_for_broadcast(freqs_cis, x):
+    ndim = x.ndim
+    shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)]
+    return freqs_cis.view(*shape)
+
+def apply_rope(query, key freqs_cis):
+    q = torch.view_as_complex(query.float().reshape(*query.shape[:-1], -1, 2))
+    k = torch.view_as_complex(key.float().reshape(*key.shape[:-1][-1], -1, 2))
+    # allow pytorch to broadcast the tensor
+    freqs_cis = reshape_for_broadcast(freqs_cis, q) 
+    # perform rotation
+    q_out = torch.view_as_real(q * freqs_cis).flatten(3)
+    k_out = torch.view_as_real(k * freqs_cis).flatten(3)
+    return q_out.type_as(query), k_out.type_as(key)
+
+
 class RMSNorm(nn.Module):
     def __init__(self):
         super().__init__()
@@ -100,8 +135,6 @@ class AttentionBlock(nn.Module):
 class Transformer(nn.Module):
     def __init__(self):
         super().__init__()
-
-
 
 # model = Transformer()
 
