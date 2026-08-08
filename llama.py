@@ -15,7 +15,7 @@ n_layers = config["n_layers"]
 eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
 
-def precompute_complex_exponential_freqs(n_embd, end, theta = 10000.0):
+def precompute_complex_exponential_freqs(n_head, end, theta = 10000.0):
     """
     end = end index
     theta = scaling factor for frequency computation
@@ -24,8 +24,8 @@ def precompute_complex_exponential_freqs(n_embd, end, theta = 10000.0):
     a + ib = r(cos(theta) + isin(theta))
     
     """
-    # calc rotation freq, make sure n_embd is even
-    freqs = 1.0 / (theta ** (torch.arange(0, n_embd, 2).float() / n_embd)) 
+    # calc rotation freq, make sure n_head is even
+    freqs = 1.0 / (theta ** (torch.arange(0, n_head, 2).float() / n_head)) 
     # array of positions
     t_pos = torch.arange(end, device=freqs.device) 
     # pos x freq
