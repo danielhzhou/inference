@@ -3,8 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import json
 
+from transformers import AutoTokenizer
+
 with open("./llama-2-7b/params.json", "r") as f:
     config = json.load(f)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    "meta-llama/Llama-2-7b-hf"
+)
 
 # hyperparams
 block_size = 4096 # i think this is typical for Llama 2 7B
@@ -16,7 +22,7 @@ eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
 max_seq_len = 2048
 
-def precompute_complex_exponential_freqs(n_head, end, theta = 10000.0):
+def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     """
     end = end index
     theta = scaling factor for frequency computation
@@ -26,7 +32,7 @@ def precompute_complex_exponential_freqs(n_head, end, theta = 10000.0):
     
     """
     # calc rotation freq, make sure n_head is even
-    freqs = 1.0 / (theta ** (torch.arange(0, n_head, 2).float() / n_head)) 
+    freqs = 1.0 / (theta ** (torch.arange(0, head_size, 2).float() / head_size)) 
     # array of positions
     t_pos = torch.arange(end, device=freqs.device) 
     # pos x freq
@@ -141,8 +147,30 @@ class Transformer(nn.Module):
         super().__init__()
 
         self.freqs_cis = precompute_complex_exponential_freqs(n_head, max_seq_len * 2)
-        
+        self.tok_embeddings = nn.Embedding(tokenizer.vocab_size, n_embd)
 
+        self.layers = nn.ModuleList
+        for _ in range(n_layers):
+            self.layers.append(AttentionBlock())
+
+        self.norm = RMSNorm()
+    
+    @torch.inference_mode()
+    def forward(self, input):
+        B, T = input.shape
+
+        tok_emb = self.tok_embeddings(input)
+        freqs_cis = self.freqs_cis[:T]
+
+        for layer in self.layer:
+            tok_emb = layer(tok_emb)
+
+        tok_emb = self.norm(tok_emb)
+
+        return tok_emb
+
+        
+        
 # model = Transformer()
 
 weights = torch.load(
