@@ -77,7 +77,7 @@ class Attention(nn.Module):
         self.wv = nn.Linear(n_embd, n_head * head_size, bias=False)
         self.wo = nn.Linear(n_head * head_size, n_embd, bias=False)
 
-        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)), persistent=False)
         
     def forward(self, x, freqs_cis):
         B, T, C = x.shape
@@ -172,11 +172,25 @@ class Transformer(nn.Module):
 
         
         
-# model = Transformer()
+model = Transformer()
 
 weights = torch.load(
     "./llama-2-7b/consolidated.00.pth",
     weights_only=True,
 )
 
+weights.pop("rope.freqs", None)
+# load llama2 weights
+model.load_state_dict(weights)
 
+input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"]
+max_tokens = 100
+for _ in range(max_tokens):
+    logits = model(input_tokens)
+    logits = logits[:, -1, :]
+    probs = F.softmax(logits, dim=-1)
+    idx_next = torch.multinomial(probs, num_samples=1)
+    input_tokens = torch.cat((input_tokens, idx_next), dim=1)
+
+text = tokenizer.decode(input_tokens[0])
+print(text)
