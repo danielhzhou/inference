@@ -138,7 +138,7 @@ class AttentionBlock(nn.Module):
     def forward(self, x, freqs_cis):
         # residual connections
         x = x + self.attention(self.attention_norm(x), freqs_cis)
-        x = x + self.feed_forward(self.ffn_norm(x), freqs_cis)
+        x = x + self.feed_forward(self.ffn_norm(x))
         return x
 
 class Transformer(nn.Module):
