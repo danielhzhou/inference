@@ -20,7 +20,6 @@ head_size = n_embd // n_head
 n_layers = config["n_layers"]
 eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
-max_seq_len = 2048
 
 def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     """
@@ -146,7 +145,7 @@ class Transformer(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.freqs_cis = precompute_complex_exponential_freqs(n_head, max_seq_len * 2)
+        self.freqs_cis = precompute_complex_exponential_freqs(n_head, block_size)
         self.tok_embeddings = nn.Embedding(tokenizer.vocab_size, n_embd)
 
         self.layers = nn.ModuleList
