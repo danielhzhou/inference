@@ -5,12 +5,12 @@ import json
 
 from transformers import AutoTokenizer
 
+device = "mps"
+
 with open("./llama-2-7b/params.json", "r") as f:
     config = json.load(f)
 
-tokenizer = AutoTokenizer.from_pretrained(
-    "meta-llama/Llama-2-7b-hf"
-)
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
 
 # hyperparams
 block_size = 4096 # i think this is typical for Llama 2 7B
@@ -76,8 +76,6 @@ class Attention(nn.Module):
         self.wq = nn.Linear(n_embd, n_head * head_size, bias=False)
         self.wv = nn.Linear(n_embd, n_head * head_size, bias=False)
         self.wo = nn.Linear(n_head * head_size, n_embd, bias=False)
-
-        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)), persistent=False)
         
     def forward(self, x, freqs_cis):
         B, T, C = x.shape
@@ -98,7 +96,9 @@ class Attention(nn.Module):
         value = value.transpose(1, 2)
 
         wei = query @ key.transpose(-2, -1) * head_size**-0.5 # (B, 32, T, 128) @ (B, 32, 128, T) = (B, 32, T, T)
-        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))
+
+        mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=wei.device))
+        wei = wei.masked_fill(~mask, float('-inf'))
         wei = F.softmax(wei, dim=-1)
 
         out = wei @ value # (B, 32, T, 128)
@@ -145,7 +145,8 @@ class Transformer(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.freqs_cis = precompute_complex_exponential_freqs(head_size, block_size)
+        freqs_cis = precompute_complex_exponential_freqs(head_size, block_size)
+        self.register_buffer("freqs_cis", freqs_cis, persistent=False)
         self.tok_embeddings = nn.Embedding(tokenizer.vocab_size, n_embd)
 
         self.layers = nn.ModuleList()
@@ -171,8 +172,9 @@ class Transformer(nn.Module):
         return final
 
         
-        
+torch.set_default_dtype(torch.float16)
 model = Transformer()
+model = model.to(device)
 
 weights = torch.load(
     "./llama-2-7b/consolidated.00.pth",
@@ -183,8 +185,8 @@ weights.pop("rope.freqs", None)
 # load llama2 weights
 model.load_state_dict(weights)
 
-input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"]
-max_tokens = 100
+input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
+max_tokens = 10
 for _ in range(max_tokens):
     logits = model(input_tokens)
     logits = logits[:, -1, :]
@@ -192,5 +194,5 @@ for _ in range(max_tokens):
     idx_next = torch.multinomial(probs, num_samples=1)
     input_tokens = torch.cat((input_tokens, idx_next), dim=1)
 
-text = tokenizer.decode(input_tokens[0])
+text = tokenizer.decode(input_tokens[0].cpu())
 print(text)
