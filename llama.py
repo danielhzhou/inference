@@ -148,7 +148,7 @@ class Transformer(nn.Module):
         self.freqs_cis = precompute_complex_exponential_freqs(n_head, block_size)
         self.tok_embeddings = nn.Embedding(tokenizer.vocab_size, n_embd)
 
-        self.layers = nn.ModuleList
+        self.layers = nn.ModuleList()
         for _ in range(n_layers):
             self.layers.append(AttentionBlock())
 
