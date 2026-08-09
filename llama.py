@@ -153,6 +153,8 @@ class Transformer(nn.Module):
             self.layers.append(AttentionBlock())
 
         self.norm = RMSNorm()
+
+        self.out = nn.Linear(n_embd, tokenizer.vocab_size)
     
     @torch.inference_mode()
     def forward(self, input):
@@ -165,8 +167,8 @@ class Transformer(nn.Module):
             tok_emb = layer(tok_emb)
 
         tok_emb = self.norm(tok_emb)
-
-        return tok_emb
+        final = self.out(tok_emb)
+        return final
 
         
         
