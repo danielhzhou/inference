@@ -135,17 +135,17 @@ class AttentionBlock(nn.Module):
         self.ln1 = RMSNorm()
         self.ln2 = RMSNorm()
 
-    def forward(self, x):
+    def forward(self, x, freqs_cis):
         # residual connections
-        x = x + self.mah(self.ln1(x))
-        x = x + self.ffwd(self.ln2(x))
+        x = x + self.mah(self.ln1(x, freqs_cis))
+        x = x + self.ffwd(self.ln2(x, freqs_cis))
         return x
 
 class Transformer(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.freqs_cis = precompute_complex_exponential_freqs(n_head, block_size)
+        self.freqs_cis = precompute_complex_exponential_freqs(head_size, block_size)
         self.tok_embeddings = nn.Embedding(tokenizer.vocab_size, n_embd)
 
         self.layers = nn.ModuleList()
@@ -154,7 +154,7 @@ class Transformer(nn.Module):
 
         self.norm = RMSNorm()
 
-        self.out = nn.Linear(n_embd, tokenizer.vocab_size)
+        self.out = nn.Linear(n_embd, tokenizer.vocab_size, bias=False)
     
     @torch.inference_mode()
     def forward(self, input):
@@ -164,7 +164,7 @@ class Transformer(nn.Module):
         freqs_cis = self.freqs_cis[:T]
 
         for layer in self.layers:
-            tok_emb = layer(tok_emb)
+            tok_emb = layer(tok_emb, freqs_cis)
 
         tok_emb = self.norm(tok_emb)
         final = self.out(tok_emb)
