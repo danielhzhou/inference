@@ -161,7 +161,7 @@ class Transformer(nn.Module):
         tok_emb = self.tok_embeddings(input)
         freqs_cis = self.freqs_cis[:T]
 
-        for layer in self.layer:
+        for layer in self.layers:
             tok_emb = layer(tok_emb)
 
         tok_emb = self.norm(tok_emb)
