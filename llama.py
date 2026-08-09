@@ -130,15 +130,15 @@ class AttentionBlock(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.mah = Attention()
-        self.ffwd = FeedForward()
-        self.ln1 = RMSNorm()
-        self.ln2 = RMSNorm()
+        self.attention = Attention()
+        self.feed_forward = FeedForward()
+        self.attention_norm = RMSNorm()
+        self.ffn_norm = RMSNorm()
 
     def forward(self, x, freqs_cis):
         # residual connections
-        x = x + self.mah(self.ln1(x, freqs_cis))
-        x = x + self.ffwd(self.ln2(x, freqs_cis))
+        x = x + self.attention(self.attention_norm(x), freqs_cis)
+        x = x + self.feed_forward(self.ffn_norm(x), freqs_cis)
         return x
 
 class Transformer(nn.Module):
@@ -154,7 +154,7 @@ class Transformer(nn.Module):
 
         self.norm = RMSNorm()
 
-        self.out = nn.Linear(n_embd, tokenizer.vocab_size, bias=False)
+        self.output = nn.Linear(n_embd, tokenizer.vocab_size, bias=False)
     
     @torch.inference_mode()
     def forward(self, input):
@@ -167,7 +167,7 @@ class Transformer(nn.Module):
             tok_emb = layer(tok_emb, freqs_cis)
 
         tok_emb = self.norm(tok_emb)
-        final = self.out(tok_emb)
+        final = self.output(tok_emb)
         return final
 
         
