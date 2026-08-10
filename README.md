@@ -2,7 +2,9 @@ learning inference
 
 todo:
 kv caching
+continuous batching
+paging
 quantization
 spec decoding
-batching
+kernels + kernel fusion
 and more
