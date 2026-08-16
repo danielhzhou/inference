@@ -21,7 +21,7 @@ n_layers = config["n_layers"]
 eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
 
-max_batch_size = 32
+max_batch_size = 1
 max_seq_len = 2048
 
 def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
