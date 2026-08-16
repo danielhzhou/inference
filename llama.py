@@ -93,7 +93,7 @@ class Attention(nn.Module):
             persistent=False,
         )
         
-    def forward(self, x, freqs_cis, start_pos):
+    def forward(self, x, freqs_cis, start_pos, mask):
         B, T, C = x.shape
 
         q = self.wq(x) # (B, T, 4096)
@@ -120,8 +120,7 @@ class Attention(nn.Module):
 
         wei = query @ key.transpose(-2, -1) * head_size**-0.5 # (B, 32, T, 128) @ (B, 32, 128, T) = (B, 32, T, start_pos + T)
 
-        if T > 1:
-            mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=wei.device))
+        if mask is not None:
             wei = wei.masked_fill(~mask, float('-inf'))
         wei = F.softmax(wei, dim=-1)
 
@@ -159,9 +158,9 @@ class AttentionBlock(nn.Module):
         self.attention_norm = RMSNorm()
         self.ffn_norm = RMSNorm()
 
-    def forward(self, x, freqs_cis, start_pos):
+    def forward(self, x, freqs_cis, start_pos, mask):
         # residual connections
-        x = x + self.attention(self.attention_norm(x), freqs_cis, start_pos)
+        x = x + self.attention(self.attention_norm(x), freqs_cis, start_pos, mask)
         x = x + self.feed_forward(self.ffn_norm(x))
         return x
 
@@ -188,8 +187,14 @@ class Transformer(nn.Module):
         tok_emb = self.tok_embeddings(input)
         freqs_cis = self.freqs_cis[start_pos:start_pos + T]
 
+        mask = None
+        if T > 1:
+            # if performing prefill of more than 1 token
+            # dont let previous tokens look at future tokens
+            mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=input.device))
+
         for layer in self.layers:
-            tok_emb = layer(tok_emb, freqs_cis, start_pos)
+            tok_emb = layer(tok_emb, freqs_cis, start_pos, mask)
 
         tok_emb = self.norm(tok_emb)
         final = self.output(tok_emb)
@@ -210,13 +215,27 @@ weights.pop("rope.freqs", None)
 model.load_state_dict(weights)
 
 input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
+B, prompt_length = input_tokens.shape
+
+# prefill
+logits = model(input_tokens, 0)
+logits = logits[:, -1, :]
+probs = F.softmax(logits, dim=-1)
+next_token = torch.multinomial(probs, num_samples=1)
+generated = torch.cat((input_tokens, next_token), dim=1)
+
+start_pos = prompt_length
+
 max_tokens = 10
-for _ in range(max_tokens):
-    logits = model(input_tokens)
+# alr generated 1 token
+for _ in range(max_tokens - 1):
+    logits = model(next_token, start_pos)
     logits = logits[:, -1, :]
     probs = F.softmax(logits, dim=-1)
-    idx_next = torch.multinomial(probs, num_samples=1)
-    input_tokens = torch.cat((input_tokens, idx_next), dim=1)
+    next_token = torch.multinomial(probs, num_samples=1)
+    generated = torch.cat((input_tokens, next_token), dim=1)
 
-text = tokenizer.decode(input_tokens[0].cpu())
+    start_pos += 1
+
+text = tokenizer.decode(generated[0].cpu())
 print(text)
