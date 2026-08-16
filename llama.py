@@ -233,7 +233,7 @@ for _ in range(max_tokens - 1):
     logits = logits[:, -1, :]
     probs = F.softmax(logits, dim=-1)
     next_token = torch.multinomial(probs, num_samples=1)
-    generated = torch.cat((input_tokens, next_token), dim=1)
+    generated = torch.cat((generated, next_token), dim=1)
 
     start_pos += 1
 
