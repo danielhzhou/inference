@@ -202,6 +202,7 @@ torch.set_default_dtype(torch.float16)
 weights = torch.load(
     "./llama-2-7b/consolidated.00.pth",
     weights_only=True,
+    mmap=True
 )
 
 with torch.device("meta"):
@@ -214,6 +215,7 @@ model.freqs_cis = precompute_complex_exponential_freqs(
     head_size,
     block_size,
 )
+del weights
 model = model.to(device)
 
 input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
