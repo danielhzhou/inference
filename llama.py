@@ -81,19 +81,14 @@ class Attention(nn.Module):
         self.wo = nn.Linear(n_head * head_size, n_embd, bias=False)
 
         # fixed size kv cache
-        self.register_buffer(
-            "cache_k",
-            torch.zeros(max_batch_size, max_seq_len, n_head, head_size),
-            persistent=False,
-        )
+        self.cache_k = None
+        self.cache_v = None
 
-        self.register_buffer(
-            "cache_v",
-            torch.zeros(max_batch_size, max_seq_len, n_head, head_size),
-            persistent=False,
-        )
-        
     def forward(self, x, freqs_cis, start_pos, mask):
+        # fixed size kv cache
+        if self.cache_k is None:
+            self.cache_k = torch.zeros(max_batch_size, max_seq_len, n_head, head_size, device=x.device, dtype=x.dtype)
+            self.cache_v = torch.zeros(max_batch_size,max_seq_len, n_head, head_size, device=x.device, dtype=x.dtype)
         B, T, C = x.shape
 
         q = self.wq(x) # (B, T, 4096)
@@ -202,17 +197,20 @@ class Transformer(nn.Module):
 
         
 torch.set_default_dtype(torch.float16)
-model = Transformer()
-model = model.to(device)
+
 
 weights = torch.load(
     "./llama-2-7b/consolidated.00.pth",
     weights_only=True,
 )
 
+with torch.device("meta"):
+    model = Transformer()
+
 weights.pop("rope.freqs", None)
 # load llama2 weights
-model.load_state_dict(weights)
+model.load_state_dict(weights, assign=True)
+model = model.to(device)
 
 input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
 B, prompt_length = input_tokens.shape
