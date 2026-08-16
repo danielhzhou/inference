@@ -118,10 +118,11 @@ class Attention(nn.Module):
         key = key.transpose(1, 2)
         value = value.transpose(1, 2)
 
-        wei = query @ key.transpose(-2, -1) * head_size**-0.5 # (B, 32, T, 128) @ (B, 32, 128, T) = (B, 32, T, T)
+        wei = query @ key.transpose(-2, -1) * head_size**-0.5 # (B, 32, T, 128) @ (B, 32, 128, T) = (B, 32, T, start_pos + T)
 
-        mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=wei.device))
-        wei = wei.masked_fill(~mask, float('-inf'))
+        if T > 1:
+            mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=wei.device))
+            wei = wei.masked_fill(~mask, float('-inf'))
         wei = F.softmax(wei, dim=-1)
 
         out = wei @ value # (B, 32, T, 128)
@@ -158,9 +159,9 @@ class AttentionBlock(nn.Module):
         self.attention_norm = RMSNorm()
         self.ffn_norm = RMSNorm()
 
-    def forward(self, x, freqs_cis):
+    def forward(self, x, freqs_cis, start_pos):
         # residual connections
-        x = x + self.attention(self.attention_norm(x), freqs_cis)
+        x = x + self.attention(self.attention_norm(x), freqs_cis, start_pos)
         x = x + self.feed_forward(self.ffn_norm(x))
         return x
 
@@ -181,14 +182,14 @@ class Transformer(nn.Module):
         self.output = nn.Linear(n_embd, tokenizer.vocab_size, bias=False)
     
     @torch.inference_mode()
-    def forward(self, input):
+    def forward(self, input, start_pos):
         B, T = input.shape
 
         tok_emb = self.tok_embeddings(input)
-        freqs_cis = self.freqs_cis[:T]
+        freqs_cis = self.freqs_cis[start_pos:start_pos + T]
 
         for layer in self.layers:
-            tok_emb = layer(tok_emb, freqs_cis)
+            tok_emb = layer(tok_emb, freqs_cis, start_pos)
 
         tok_emb = self.norm(tok_emb)
         final = self.output(tok_emb)
