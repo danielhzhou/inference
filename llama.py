@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import json
+import time
 
 from transformers import AutoTokenizer
 
@@ -221,6 +222,9 @@ model = model.to(device)
 input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
 B, prompt_length = input_tokens.shape
 
+torch.mps.synchronize()
+start = time.perf_counter()
+
 # prefill
 logits = model(input_tokens, 0)
 logits = logits[:, -1, :]
@@ -230,7 +234,7 @@ generated = torch.cat((input_tokens, next_token), dim=1)
 
 start_pos = prompt_length
 
-max_tokens = 10
+max_tokens = 100
 # alr generated 1 token
 for _ in range(max_tokens - 1):
     logits = model(next_token, start_pos)
@@ -240,6 +244,12 @@ for _ in range(max_tokens - 1):
     generated = torch.cat((generated, next_token), dim=1)
 
     start_pos += 1
+
+torch.mps.synchronize()
+end = time.perf_counter()
+
+print(f"KV cache: {end - start:.3f} seconds")
+print(f"Tokens/sec: {max_tokens / (end - start):.2f}")
 
 text = tokenizer.decode(generated[0].cpu())
 print(text)

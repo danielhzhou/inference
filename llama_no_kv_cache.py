@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import json
+import time
 
 from transformers import AutoTokenizer
 
@@ -219,7 +220,10 @@ input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
 
 generated = input_tokens
 
-max_tokens = 10
+max_tokens = 100
+
+torch.mps.synchronize()
+start = time.perf_counter()
 
 for _ in range(max_tokens):
     # NO KV CACHE:
@@ -233,6 +237,10 @@ for _ in range(max_tokens):
 
     generated = torch.cat((generated, next_token), dim=1)
 
+torch.mps.synchronize()
+end = time.perf_counter()
+print(f"No KV cache: {end - start:.3f} seconds")
+print(f"Tokens/sec: {max_tokens / (end - start):.2f}")
 
 text = tokenizer.decode(generated[0].cpu())
 print(text)
