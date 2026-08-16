@@ -21,6 +21,9 @@ n_layers = config["n_layers"]
 eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
 
+max_batch_size = 32
+max_seq_len = 2048
+
 def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     """
     end = end index
@@ -76,8 +79,21 @@ class Attention(nn.Module):
         self.wq = nn.Linear(n_embd, n_head * head_size, bias=False)
         self.wv = nn.Linear(n_embd, n_head * head_size, bias=False)
         self.wo = nn.Linear(n_head * head_size, n_embd, bias=False)
+
+        # fixed size kv cache
+        self.register_buffer(
+            "cache_k",
+            torch.zeros(max_batch_size, max_seq_len, n_head, head_size),
+            persistent=False,
+        )
+
+        self.register_buffer(
+            "cache_v",
+            torch.zeros(max_batch_size, max_seq_len, n_head, head_size),
+            persistent=False,
+        )
         
-    def forward(self, x, freqs_cis):
+    def forward(self, x, freqs_cis, start_pos):
         B, T, C = x.shape
 
         q = self.wq(x) # (B, T, 4096)
@@ -90,6 +106,13 @@ class Attention(nn.Module):
         value = v.view(B, T, n_head, head_size)
 
         query, key = apply_rope(query, key, freqs_cis=freqs_cis)
+
+        # cache token pos (T should be 1 for kv cache aware inference)
+        self.cache_k[:B, start_pos:start_pos + T] = key
+        self.cache_v[:B, start_pos:start_pos + T] = value
+
+        key = self.cache_k[:B, :start_pos + T]
+        value = self.cache_v[:B, :start_pos + T]
 
         query = query.transpose(1, 2) # (B, 32, T, 128)
         key = key.transpose(1, 2)
