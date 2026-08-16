@@ -210,6 +210,10 @@ with torch.device("meta"):
 weights.pop("rope.freqs", None)
 # load llama2 weights
 model.load_state_dict(weights, assign=True)
+model.freqs_cis = precompute_complex_exponential_freqs(
+    head_size,
+    block_size,
+)
 model = model.to(device)
 
 input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
