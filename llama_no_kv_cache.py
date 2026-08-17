@@ -22,7 +22,7 @@ n_layers = config["n_layers"]
 eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
 
-max_batch_size = 1
+max_batch_size = 4
 max_seq_len = 2048
 
 def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
@@ -220,7 +220,7 @@ input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
 
 generated = input_tokens
 
-max_tokens = 100
+max_tokens = 2048
 
 torch.mps.synchronize()
 start = time.perf_counter()
