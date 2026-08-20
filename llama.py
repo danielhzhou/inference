@@ -24,6 +24,7 @@ multiple_of = config["multiple_of"]
 
 max_batch_size = 4
 max_seq_len = 2048
+prefill_batch_size = 32
 
 def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     """
@@ -185,9 +186,13 @@ class Transformer(nn.Module):
 
         mask = None
         if T > 1:
+            # add cached tokens 
+            prefix_mask = torch.ones(T, start_pos, dtype=torch.bool, device=input.device)
             # if performing prefill of more than 1 token
             # dont let previous tokens look at future tokens
-            mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=input.device))
+            chunk_mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=input.device))
+
+            mask = torch.cat([prefix_mask, chunk_mask], dim=-1)
 
         for layer in self.layers:
             tok_emb = layer(tok_emb, freqs_cis, start_pos, mask)
@@ -225,8 +230,17 @@ B, prompt_length = input_tokens.shape
 torch.mps.synchronize()
 start = time.perf_counter()
 
-# prefill
-logits = model(input_tokens, 0)
+# batched prefill
+tokens_processed = 0
+while tokens_processed < prompt_length:
+    remaining_tokens = prompt_length - tokens_processed
+    chunk_size = min(prefill_batch_size, remaining_tokens)
+    chunk = input_tokens[:, tokens_processed:tokens_processed + chunk_size]
+
+    logits = model(chunk, tokens_processed)
+
+    tokens_processed += chunk_size
+
 logits = logits[:, -1, :]
 probs = F.softmax(logits, dim=-1)
 next_token = torch.multinomial(probs, num_samples=1)
