@@ -24,7 +24,7 @@ multiple_of = config["multiple_of"]
 
 max_batch_size = 4
 max_seq_len = 2048
-prefill_batch_size = 32
+prefill_chunk_size = 32
 
 def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     """
@@ -234,7 +234,7 @@ start = time.perf_counter()
 tokens_processed = 0
 while tokens_processed < prompt_length:
     remaining_tokens = prompt_length - tokens_processed
-    chunk_size = min(prefill_batch_size, remaining_tokens)
+    chunk_size = min(prefill_chunk_size, remaining_tokens)
     chunk = input_tokens[:, tokens_processed:tokens_processed + chunk_size]
 
     logits = model(chunk, tokens_processed)
