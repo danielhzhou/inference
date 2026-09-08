@@ -19,5 +19,9 @@ class KVCache:
 
         return allocated_page
 
-    
+    def free_request(self, request_id):
+        pages = self.page_map.pop(request_id, [])
+
+        for page in pages:
+            self.free.add(page)
     
