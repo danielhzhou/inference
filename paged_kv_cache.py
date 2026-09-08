@@ -2,6 +2,7 @@ from collections import defaultdict
 #TODO finish KV cache impl 
 class PagedKVCache:
     def __init__(self):
+        # llama2 params
         self.page_map = defaultdict(list) # request -> page numbers of pages allocated
         self.total_bytes = 4 * 1024**3 # 4 GiB
         self.page_size = 16 * 512 * 1024 # 16 tokens in FP16
@@ -10,12 +11,14 @@ class PagedKVCache:
         self.free = set([i for i in range(self.num_pages)])
 
     def add_request(self, request_id):
+        # init request
         if request_id in self.page_map:
             raise ValueError("request exists already")
 
         self.page_map[request_id] = []
 
     def _palloc(self, request_id):
+        # internally allocate a page
         if not self.free:
             raise RuntimeError("oom")
 
@@ -37,4 +40,5 @@ class PagedKVCache:
         pass
 
     def get_page_table(self, request_id):
+        # return page table for this request
         pass
