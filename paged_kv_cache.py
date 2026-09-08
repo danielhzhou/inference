@@ -10,7 +10,10 @@ class PagedKVCache:
         self.free = set([i for i in range(self.num_pages)])
 
     def add_request(self, request_id):
-        pass
+        if request_id in self.page_map:
+            raise ValueError("request exists already")
+
+        self.page_map[request_id] = []
 
     def _palloc(self, request_id):
         if not self.free:
