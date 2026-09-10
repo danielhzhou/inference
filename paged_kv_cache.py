@@ -79,6 +79,9 @@ class PagedKVCache:
         if request_id not in self.page_map:
             raise ValueError("request does not exist")
 
+        if seq_len <= 0:
+            raise ValueError("seq_len must be positive")
+
         tokens_left = seq_len
         k = []
         v = []
@@ -93,6 +96,9 @@ class PagedKVCache:
             v.append(self.v_cache[physical_page, :tokens_to_read, layer_idx])
 
             tokens_left -= tokens_to_read
+
+        if tokens_left > 0:
+            raise ValueError("not enough KV tokens allocated")
 
         key = torch.cat(k, dim=0)
         value = torch.cat(v, dim=0)
