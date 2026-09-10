@@ -1,18 +1,25 @@
 from collections import defaultdict
+import torch
 #TODO finish KV cache impl 
 class PagedKVCache:
-    def __init__(self):
+    def __init__(self, num_layers, n_heads, head_dim):
         # llama2 params
         self.page_map = defaultdict(list) # request -> page numbers of pages allocated
         self.total_bytes = 4 * 1024**3 # 4 GiB
         self.page_size = 16 * 512 * 1024 # 16 tokens in FP16
         self.num_pages = self.total_bytes // self.page_size
+        self.num_layers = num_layers
+        self.n_heads = n_heads
+        self.head_dim = head_dim
+        self.tokens_per_page = 16
+        # continuous batching
+        # self.sequence_lengths = defaultdict(int)
 
         self.free = set([i for i in range(self.num_pages)])
 
         # actual memory block
-        self.k_cache = None
-        self.v_cache = None
+        self.k_cache = torch.empty(self.num_pages, self.tokens_per_page, self.num_layers, self.n_heads, self.head_dim, dtype=torch.float16)
+        self.v_cache = torch.empty(self.num_pages, self.tokens_per_page, self.num_layers, self.n_heads, self.head_dim, dtype=torch.float16)
 
     def add_request(self, request_id):
         # init request
@@ -39,10 +46,39 @@ class PagedKVCache:
         for page in pages:
             self.free.add(page)
 
-    def write(self):
+    def write(self, request_id, start_pos, layer_idx, key, value):
         # write to the KV cache
-        pass
+        if request_id not in self.page_map:
+            raise ValueError("request does not exist")
 
+        B, T, n_head, head_size = key.shape
+
+        if n_head != self.n_heads:
+            raise ValueError("mismatch! num heads")
+        if head_size != self.head_dim:
+            raise ValueError("mismatch! head dim")
+
+        for t in range(T):
+            token_pos = start_pos + t
+
+            logical_page = token_pos // self.tokens_per_page
+            offset = token_pos % self.tokens_per_page
+
+            while logical_page >= len(self.page_map[request_id]):
+                self._palloc(request_id)
+
+            physical_page = self.page_map[request_id][logical_page]
+
+            self.k_cache[physical_page, offset, layer_idx] = key[0, t]
+            self.v_cache[physical_page, offset, layer_idx] = value[0, t]
+
+    def read(self, request_id):
+        if request_id not in self.page_map:
+            raise ValueError("request does not exist")
+            
     def get_page_table(self, request_id):
         # return page table for this request
-        pass
+        if request_id not in self.page_map:
+            raise ValueError("request does not exist")
+
+        return self.page_map[request_id]
