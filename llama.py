@@ -17,8 +17,8 @@ tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
 # hyperparams
 block_size = 4096 # Llama 2 7B
 n_embd = config["dim"]
-n_head = config["n_heads"]
-head_size = n_embd // n_head
+n_heads = config["n_heads"]
+head_size = n_embd // n_heads
 n_layers = config["n_layers"]
 eps = config["norm_eps"]
 multiple_of = config["multiple_of"]
@@ -27,7 +27,7 @@ max_batch_size = 4
 max_seq_len = 2048
 prefill_chunk_size = 32
 
-kv_cache = PagedKVCache(n_layers, n_head, head_size, device)
+kv_cache = PagedKVCache(n_layers, n_heads, head_size, device)
 
 def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     """
@@ -38,7 +38,7 @@ def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     a + ib = r(cos(theta) + isin(theta))
     
     """
-    # calc rotation freq, make sure n_head is even
+    # calc rotation freq, make sure n_heads is even
     freqs = 1.0 / (theta ** (torch.arange(0, head_size, 2).float() / head_size)) 
     # array of positions
     t_pos = torch.arange(end, device=freqs.device) 
@@ -80,10 +80,10 @@ class RMSNorm(nn.Module):
 class Attention(nn.Module):
     def __init__(self):
         super().__init__()
-        self.wk = nn.Linear(n_embd, n_head * head_size, bias=False)
-        self.wq = nn.Linear(n_embd, n_head * head_size, bias=False)
-        self.wv = nn.Linear(n_embd, n_head * head_size, bias=False)
-        self.wo = nn.Linear(n_head * head_size, n_embd, bias=False)
+        self.wk = nn.Linear(n_embd, n_heads * head_size, bias=False)
+        self.wq = nn.Linear(n_embd, n_heads * head_size, bias=False)
+        self.wv = nn.Linear(n_embd, n_heads * head_size, bias=False)
+        self.wo = nn.Linear(n_heads * head_size, n_embd, bias=False)
 
     def forward(self, x, freqs_cis, start_pos, mask, request_id, layer_id):
         B, T, C = x.shape
@@ -93,9 +93,9 @@ class Attention(nn.Module):
         v = self.wv(x)
 
         # split into attention heads
-        query = q.view(B, T, n_head, head_size) # (B, T, 32, 128)
-        key = k.view(B, T, n_head, head_size)
-        value = v.view(B, T, n_head, head_size)
+        query = q.view(B, T, n_heads, head_size) # (B, T, 32, 128)
+        key = k.view(B, T, n_heads, head_size)
+        value = v.view(B, T, n_heads, head_size)
 
         query, key = apply_rope(query, key, freqs_cis=freqs_cis)
 
