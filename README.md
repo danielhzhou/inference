@@ -1,12 +1,13 @@
-learning inference
+# Learning LLM Inference
 
-this repository runs inference for Llama2-7B
+A from-scratch inference engine for **Llama 2 7B**, built to learn and implement modern LLM inference techniques.
 
-todo:
-[x] kv caching
-[] continuous batching
-[] paging
-[] quantization
-[] spec decoding
-[] kernels + kernel fusion
-and more
+## Progress
+
+* [x] KV caching
+* [ ] Continuous batching
+* [ ] Paged KV cache
+* [ ] Quantization
+* [ ] Speculative decoding
+* [ ] Custom kernels + kernel fusion
+* [ ] More to come

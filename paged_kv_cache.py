@@ -10,6 +10,10 @@ class PagedKVCache:
 
         self.free = set([i for i in range(self.num_pages)])
 
+        # actual memory block
+        self.k_cache = None
+        self.v_cache = None
+
     def add_request(self, request_id):
         # init request
         if request_id in self.page_map:
