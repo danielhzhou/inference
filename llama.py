@@ -5,6 +5,7 @@ import json
 import time
 
 from transformers import AutoTokenizer
+from paged_kv_cache import PagedKVCache
 
 device = "mps"
 
@@ -14,7 +15,7 @@ with open("./llama-2-7b/params.json", "r") as f:
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
 
 # hyperparams
-block_size = 4096 # i think this is typical for Llama 2 7B
+block_size = 4096 # Llama 2 7B
 n_embd = config["dim"]
 n_head = config["n_heads"]
 head_size = n_embd // n_head
@@ -25,6 +26,8 @@ multiple_of = config["multiple_of"]
 max_batch_size = 4
 max_seq_len = 2048
 prefill_chunk_size = 32
+
+kv_cache = PagedKVCache(n_layers, n_head, head_size, device)
 
 def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     """
@@ -82,15 +85,7 @@ class Attention(nn.Module):
         self.wv = nn.Linear(n_embd, n_head * head_size, bias=False)
         self.wo = nn.Linear(n_head * head_size, n_embd, bias=False)
 
-        # fixed size kv cache
-        self.cache_k = None
-        self.cache_v = None
-
-    def forward(self, x, freqs_cis, start_pos, mask):
-        # fixed size kv cache
-        if self.cache_k is None:
-            self.cache_k = torch.zeros(max_batch_size, max_seq_len, n_head, head_size, device=x.device, dtype=x.dtype)
-            self.cache_v = torch.zeros(max_batch_size,max_seq_len, n_head, head_size, device=x.device, dtype=x.dtype)
+    def forward(self, x, freqs_cis, start_pos, mask, request_id, layer_id):
         B, T, C = x.shape
 
         q = self.wq(x) # (B, T, 4096)
@@ -105,11 +100,9 @@ class Attention(nn.Module):
         query, key = apply_rope(query, key, freqs_cis=freqs_cis)
 
         # cache token pos (T should be 1 for kv cache aware inference)
-        self.cache_k[:B, start_pos:start_pos + T] = key
-        self.cache_v[:B, start_pos:start_pos + T] = value
+        kv_cache.write(request_id, start_pos, layer_id, key, value)
 
-        key = self.cache_k[:B, :start_pos + T]
-        value = self.cache_v[:B, :start_pos + T]
+        key, value = kv_cache.read(request_id, layer_id, start_pos + T)
 
         query = query.transpose(1, 2) # (B, 32, T, 128)
         key = key.transpose(1, 2)
@@ -155,9 +148,9 @@ class AttentionBlock(nn.Module):
         self.attention_norm = RMSNorm()
         self.ffn_norm = RMSNorm()
 
-    def forward(self, x, freqs_cis, start_pos, mask):
+    def forward(self, x, freqs_cis, start_pos, mask, request_id, layer_id):
         # residual connections
-        x = x + self.attention(self.attention_norm(x), freqs_cis, start_pos, mask)
+        x = x + self.attention(self.attention_norm(x), freqs_cis, start_pos, mask, request_id, layer_id)
         x = x + self.feed_forward(self.ffn_norm(x))
         return x
 
@@ -178,7 +171,7 @@ class Transformer(nn.Module):
         self.output = nn.Linear(n_embd, tokenizer.vocab_size, bias=False)
     
     @torch.inference_mode()
-    def forward(self, input, start_pos):
+    def forward(self, input, start_pos, request_id):
         B, T = input.shape
 
         tok_emb = self.tok_embeddings(input)
@@ -194,8 +187,8 @@ class Transformer(nn.Module):
 
             mask = torch.cat([prefix_mask, chunk_mask], dim=-1)
 
-        for layer in self.layers:
-            tok_emb = layer(tok_emb, freqs_cis, start_pos, mask)
+        for layer_id, layer in enumerate(self.layers):
+            tok_emb = layer(tok_emb, freqs_cis, start_pos, mask, request_id, layer_id)
 
         tok_emb = self.norm(tok_emb)
         final = self.output(tok_emb)
@@ -226,6 +219,8 @@ model = model.to(device)
 
 input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
 B, prompt_length = input_tokens.shape
+request_id = 0
+kv_cache.add(request_id)
 
 torch.mps.synchronize()
 start = time.perf_counter()
@@ -237,7 +232,7 @@ while tokens_processed < prompt_length:
     chunk_size = min(prefill_chunk_size, remaining_tokens)
     chunk = input_tokens[:, tokens_processed:tokens_processed + chunk_size]
 
-    logits = model(chunk, tokens_processed)
+    logits = model(chunk, tokens_processed, request_id)
 
     tokens_processed += chunk_size
 
