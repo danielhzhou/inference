@@ -2,24 +2,26 @@ from collections import defaultdict
 import torch
 #TODO finish KV cache impl 
 class PagedKVCache:
-    def __init__(self, num_layers, n_heads, head_dim):
+    def __init__(self, num_layers, n_heads, head_dim, device):
         # llama2 params
         self.page_map = defaultdict(list) # request -> page numbers of pages allocated
         self.total_bytes = 4 * 1024**3 # 4 GiB
-        self.page_size = 16 * 512 * 1024 # 16 tokens in FP16
         self.num_pages = self.total_bytes // self.page_size
         self.num_layers = num_layers
         self.n_heads = n_heads
         self.head_dim = head_dim
         self.tokens_per_page = 16
+
+        self.page_size = self.tokens_per_page * self.num_layers * self.n_heads * self.head_dim * 2 * 2
+
         # continuous batching
         # self.sequence_lengths = defaultdict(int)
 
         self.free = set([i for i in range(self.num_pages)])
 
         # actual memory block
-        self.k_cache = torch.empty(self.num_pages, self.tokens_per_page, self.num_layers, self.n_heads, self.head_dim, dtype=torch.float16)
-        self.v_cache = torch.empty(self.num_pages, self.tokens_per_page, self.num_layers, self.n_heads, self.head_dim, dtype=torch.float16)
+        self.k_cache = torch.empty(self.num_pages, self.tokens_per_page, self.num_layers, self.n_heads, self.head_dim, dtype=torch.float16, device=device)
+        self.v_cache = torch.empty(self.num_pages, self.tokens_per_page, self.num_layers, self.n_heads, self.head_dim, dtype=torch.float16, device=device)
 
     def add_request(self, request_id):
         # init request
