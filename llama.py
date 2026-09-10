@@ -193,10 +193,8 @@ class Transformer(nn.Module):
         tok_emb = self.norm(tok_emb)
         final = self.output(tok_emb)
         return final
-
-        
+ 
 torch.set_default_dtype(torch.float16)
-
 
 weights = torch.load(
     "./llama-2-7b/consolidated.00.pth",
