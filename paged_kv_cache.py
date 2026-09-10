@@ -72,9 +72,30 @@ class PagedKVCache:
             self.k_cache[physical_page, offset, layer_idx] = key[0, t]
             self.v_cache[physical_page, offset, layer_idx] = value[0, t]
 
-    def read(self, request_id):
+    def read(self, request_id, layer_idx, seq_len):
+        # returns (key, value) tuple
         if request_id not in self.page_map:
             raise ValueError("request does not exist")
+
+        tokens_left = seq_len
+        k = []
+        v = []
+
+        for physical_page in self.page_map[request_id]:
+            if tokens_left <= 0:
+                break
+
+            tokens_to_read = min(self.tokens_per_page, tokens_left)
+
+            k.append(self.k_cache[physical_page, :tokens_to_read, layer_idx])
+            v.append(self.v_cache[physical_page, :tokens_to_read, layer_idx])
+
+            tokens_left -= tokens_to_read
+
+        key = torch.cat(k, dim=0)
+        value = torch.cat(v, dim=0)
+
+        return (key.unsqueeze(0), value.unsqueeze(0))
             
     def get_page_table(self, request_id):
         # return page table for this request
