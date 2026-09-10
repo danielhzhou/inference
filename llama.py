@@ -220,7 +220,7 @@ model = model.to(device)
 input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
 B, prompt_length = input_tokens.shape
 request_id = 0
-kv_cache.add(request_id)
+kv_cache.add_request(request_id)
 
 torch.mps.synchronize()
 start = time.perf_counter()
@@ -246,7 +246,7 @@ start_pos = prompt_length
 max_tokens = 2048
 # alr generated 1 token
 for _ in range(max_tokens - 1):
-    logits = model(next_token, start_pos)
+    logits = model(next_token, start_pos, request_id)
     logits = logits[:, -1, :]
     probs = F.softmax(logits, dim=-1)
     next_token = torch.multinomial(probs, num_samples=1)
