@@ -6,13 +6,14 @@ class PagedKVCache:
         # llama2 params
         self.page_map = defaultdict(list) # request -> page numbers of pages allocated
         self.total_bytes = 4 * 1024**3 # 4 GiB
-        self.num_pages = self.total_bytes // self.page_size
         self.num_layers = num_layers
         self.n_heads = n_heads
         self.head_dim = head_dim
         self.tokens_per_page = 16
 
         self.page_size = self.tokens_per_page * self.num_layers * self.n_heads * self.head_dim * 2 * 2
+        self.num_pages = self.total_bytes // self.page_size
+
 
         # continuous batching
         # self.sequence_lengths = defaultdict(int)
