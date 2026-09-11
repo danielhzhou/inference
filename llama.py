@@ -27,8 +27,6 @@ max_batch_size = 4
 max_seq_len = 2048
 prefill_chunk_size = 32
 
-kv_cache = PagedKVCache(n_layers, n_heads, head_size, device)
-
 def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     """
     end = end index
@@ -214,6 +212,10 @@ model.freqs_cis = precompute_complex_exponential_freqs(
 )
 del weights
 model = model.to(device)
+model_dtype = next(model.parameters()).dtype
+print(f"model_dtype: {model_dtype}")
+
+kv_cache = PagedKVCache(n_layers, n_heads, head_size, device, model_dtype)
 
 input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
 B, prompt_length = input_tokens.shape

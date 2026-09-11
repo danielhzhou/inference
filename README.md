@@ -4,10 +4,14 @@ A from-scratch inference engine for **Llama 2 7B**, built to learn and implement
 
 ## Progress
 
-* [x] KV caching
-* [ ] Continuous batching
-* [ ] Paged KV cache
-* [ ] Quantization
-* [ ] Speculative decoding
-* [ ] Custom kernels + kernel fusion
-* [ ] More to come
+* [x] basic inference
+* [x] KV cache
+* [x] chunked prefill
+* [x] paged KV allocation
+* [ ] continuous batching
+* [ ] inference engine / scheduler
+* [ ] serving API
+* [ ] paged attention kernel
+* [ ] quantization
+* [ ] speculative decoding
+* [ ] more
