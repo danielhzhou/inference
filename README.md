@@ -29,3 +29,8 @@ Run `python llama.py` from the repo root with PyTorch, Transformers, and Sentenc
 - [for_colab/](learning/for_colab/): bigram/self-attention walkthrough, GPT training, and Llama 2 inference notebooks.
 
 Run training scripts from `learning/` with Tiny Shakespeare saved as `input.txt`.
+
+## Results
+
+On **1× H100**, a pre-allocated KV cache with position-indexed writes improved throughput **7.74× at 2K context** versus no cache.
+More results coming soon...
