@@ -32,5 +32,5 @@ Run training scripts from `learning/` with Tiny Shakespeare saved as `input.txt`
 
 ## Results
 
-On **1× H100**, a pre-allocated KV cache with position-indexed writes improved throughput **7.74× at 2K context** versus no cache.
+On **1×H100**, a pre-allocated KV cache with position-indexed writes improved throughput **7.74× at 2K context** versus no cache.
 More results coming soon...
