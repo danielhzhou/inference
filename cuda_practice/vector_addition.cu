@@ -34,7 +34,7 @@ int main() {
     cudaFree(d_a);
     cudaFree(d_b);
     cudaFree(d_out);
-    free(h_out)
+    free(h_out);
 
-    return 0
+    return 0;
 }
