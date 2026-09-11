@@ -2,7 +2,7 @@
 #include <iostream>
 
 __global__ void vector_addition(const float* d_a, const float* d_b, float* d_out, int N){
-    int i = threadIdx.x;
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i < N) {
         d_out[i] = d_a[i] + d_b[i];
     }
