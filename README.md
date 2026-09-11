@@ -18,7 +18,7 @@ A from-scratch **Llama 2 7B inference engine** in PyTorch, building toward an **
 - [paged_kv_cache.py](paged_kv_cache.py): per-request KV page allocation and storage.
 - [llama_no_kv_cache.py](llama_no_kv_cache.py): uncached baseline.
 
-Run `python llama.py` from the repo root with PyTorch, Transformers, and SentencePiece installed. Requires `llama-2-7b/{params.json,consolidated.00.pth}` and access to the `meta-llama/Llama-2-7b-hf` tokenizer.
+Run `python llama.py` from the repo root with PyTorch, Transformers, and SentencePiece installed. Requires access to llama-2-7b and access to the `meta-llama/Llama-2-7b-hf` tokenizer.
 
 ## Learning projects
 
