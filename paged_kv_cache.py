@@ -15,7 +15,7 @@ class PagedKVCache:
         self.num_pages = self.total_bytes // self.page_size
 
         # continuous batching
-        # self.sequence_lengths = defaultdict(int)
+        self.sequence_lengths = defaultdict(int)
 
         self.free = set([i for i in range(self.num_pages)])
 
