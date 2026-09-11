@@ -24,8 +24,8 @@ Run `python llama.py` from the repo root with PyTorch, Transformers, and Sentenc
 
 - [bigram_model.py](learning/bigram_model.py): Andrej Karpathy's character-level bigram model on Tiny Shakespeare.
 - [gpt.py](learning/gpt.py): character-level transformer trained on Tiny Shakespeare.
-- [pytorch_learning/](learning/pytorch_learning/): tensors, neural networks, softmax, layer normalization, and masking.
-- [cuda_practice/](learning/cuda_practice/): vector addition, array shifts, and synchronization.
+- [pytorch_learning/](learning/pytorch_learning/): pytorch practice + learning
+- [cuda_practice/](learning/cuda_practice/): cuda kernel practice + learning
 - [for_colab/](learning/for_colab/): bigram/self-attention walkthrough, GPT training, and Llama 2 inference notebooks.
 
 Run training scripts from `learning/` with Tiny Shakespeare saved as `input.txt`.
