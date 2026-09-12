@@ -25,15 +25,18 @@ class InferenceEngine:
     def prefill(self, request: InferenceRequest, chunk_size: int) -> None:
         """Process one prompt chunk; sample the first output token
         if prefill finishes."""
+        pass
 
     def decode(self, requests: List[InferenceRequest]) -> None:
         """Process one pending token per request in a batch,
         then sample one new token per request."""
+        pass
 
     def step(self) -> None:
         """Admit waiting requests that fit.
         Run a decode batch and a prefill chunk.
         Finish requests that hit EOS or their token limit."""
+        pass
 
     def run_generation_loop(self) -> None:
         pass
