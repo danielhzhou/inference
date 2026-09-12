@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+
 @dataclass
-class Request:
+class InferenceRequest:
     prompt: list[int] # list of tokens
     max_tokens: int # max total number of tokens generated incl the prompt
     id: int
