@@ -191,74 +191,77 @@ class Transformer(nn.Module):
         tok_emb = self.norm(tok_emb)
         final = self.output(tok_emb)
         return final
+
+
+if __name__ == "__main__":
  
-torch.set_default_dtype(torch.float16)
+    torch.set_default_dtype(torch.float16)
 
-weights = torch.load(
-    "./llama-2-7b/consolidated.00.pth",
-    weights_only=True,
-    mmap=True
-)
+    weights = torch.load(
+        "./llama-2-7b/consolidated.00.pth",
+        weights_only=True,
+        mmap=True
+    )
 
-with torch.device("meta"):
-    model = Transformer()
+    with torch.device("meta"):
+        model = Transformer()
 
-weights.pop("rope.freqs", None)
-# load llama2 weights
-model.load_state_dict(weights, assign=True)
-model.freqs_cis = precompute_complex_exponential_freqs(
-    head_size,
-    block_size,
-)
-del weights
-model = model.to(device)
-model_dtype = next(model.parameters()).dtype
-print(f"model_dtype: {model_dtype}")
+    weights.pop("rope.freqs", None)
+    # load llama2 weights
+    model.load_state_dict(weights, assign=True)
+    model.freqs_cis = precompute_complex_exponential_freqs(
+        head_size,
+        block_size,
+    )
+    del weights
+    model = model.to(device)
+    model_dtype = next(model.parameters()).dtype
+    print(f"model_dtype: {model_dtype}")
 
-kv_cache = PagedKVCache(n_layers, n_heads, head_size, device, model_dtype)
+    kv_cache = PagedKVCache(n_layers, n_heads, head_size, device, model_dtype)
 
-input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
-B, prompt_length = input_tokens.shape
-request_id = 0
-kv_cache.add_request(request_id)
+    input_tokens = tokenizer("hello", return_tensors="pt")["input_ids"].to(device)
+    B, prompt_length = input_tokens.shape
+    request_id = 0
+    kv_cache.add_request(request_id)
 
-torch.mps.synchronize()
-start = time.perf_counter()
+    torch.mps.synchronize()
+    start = time.perf_counter()
 
-# batched prefill
-tokens_processed = 0
-while tokens_processed < prompt_length:
-    remaining_tokens = prompt_length - tokens_processed
-    chunk_size = min(prefill_chunk_size, remaining_tokens)
-    chunk = input_tokens[:, tokens_processed:tokens_processed + chunk_size]
+    # batched prefill
+    tokens_processed = 0
+    while tokens_processed < prompt_length:
+        remaining_tokens = prompt_length - tokens_processed
+        chunk_size = min(prefill_chunk_size, remaining_tokens)
+        chunk = input_tokens[:, tokens_processed:tokens_processed + chunk_size]
 
-    logits = model(chunk, tokens_processed, request_id)
+        logits = model(chunk, tokens_processed, request_id)
 
-    tokens_processed += chunk_size
+        tokens_processed += chunk_size
 
-logits = logits[:, -1, :]
-probs = F.softmax(logits, dim=-1)
-next_token = torch.multinomial(probs, num_samples=1)
-generated = torch.cat((input_tokens, next_token), dim=1)
-
-start_pos = prompt_length
-
-max_tokens = 2048
-# alr generated 1 token
-for _ in range(max_tokens - 1):
-    logits = model(next_token, start_pos, request_id)
     logits = logits[:, -1, :]
     probs = F.softmax(logits, dim=-1)
     next_token = torch.multinomial(probs, num_samples=1)
-    generated = torch.cat((generated, next_token), dim=1)
+    generated = torch.cat((input_tokens, next_token), dim=1)
 
-    start_pos += 1
+    start_pos = prompt_length
 
-torch.mps.synchronize()
-end = time.perf_counter()
+    max_tokens = 2048
+    # alr generated 1 token
+    for _ in range(max_tokens - 1):
+        logits = model(next_token, start_pos, request_id)
+        logits = logits[:, -1, :]
+        probs = F.softmax(logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+        generated = torch.cat((generated, next_token), dim=1)
 
-print(f"KV cache: {end - start:.3f} seconds")
-print(f"Tokens/sec: {max_tokens / (end - start):.2f}")
+        start_pos += 1
 
-text = tokenizer.decode(generated[0].cpu())
-print(text)
+    torch.mps.synchronize()
+    end = time.perf_counter()
+
+    print(f"KV cache: {end - start:.3f} seconds")
+    print(f"Tokens/sec: {max_tokens / (end - start):.2f}")
+
+    text = tokenizer.decode(generated[0].cpu())
+    print(text)
