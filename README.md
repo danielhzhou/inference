@@ -1,6 +1,6 @@
 # Llama 2 7B Inference Engine
 
-A from-scratch **Llama 2 7B inference engine** in PyTorch, building toward an **inference serving engine** with request scheduling and continuous batching.
+A from scratch **Llama 2 7B inference engine** in PyTorch, building toward an **inference serving engine** with request scheduling and continuous batching.
 
 ## Progress
 
