@@ -54,7 +54,23 @@ class InferenceEngine:
     def prefill(self, request: InferenceRequest, chunk_size: int) -> None:
         """Process one prompt chunk; sample the first output token
         if prefill finishes."""
-        pass
+        # batched prefill
+        tokens_processed = 0
+        while tokens_processed < len(request.prompt):
+            remaining_tokens = len(request.prompt) - tokens_processed
+            chunk_size = min(chunk_size, remaining_tokens)
+            chunk = request.prompt[:, tokens_processed:tokens_processed + chunk_size]
+
+            logits = self.model(chunk, tokens_processed, request.id)
+
+            tokens_processed += chunk_size
+
+        logits = logits[:, -1, :]
+        probs = F.softmax(logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+        generated = torch.cat((input_tokens, next_token), dim=1)
+
+        start_pos = prompt_length
 
     def decode(self, requests: List[InferenceRequest]) -> None:
         """Process one pending token per request in a batch,
