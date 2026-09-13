@@ -20,16 +20,6 @@ A from scratch **Llama 2 7B inference engine** in PyTorch, building toward an **
 
 Run `python llama.py` from the repo root with PyTorch, Transformers, and SentencePiece installed. Requires access to llama-2-7b and access to the `meta-llama/Llama-2-7b-hf` tokenizer.
 
-## Learning projects
-
-- [bigram_model.py](learning/bigram_model.py): Andrej Karpathy's character-level bigram model on Tiny Shakespeare.
-- [gpt.py](learning/gpt.py): character-level transformer trained on Tiny Shakespeare.
-- [pytorch_learning/](learning/pytorch_learning/): pytorch practice + learning
-- [cuda_practice/](learning/cuda_practice/): cuda kernel practice + learning
-- [for_colab/](learning/for_colab/): bigram/self-attention walkthrough, GPT training, and Llama 2 inference notebooks.
-
-Run training scripts from `learning/` with Tiny Shakespeare saved as `input.txt`.
-
 ## Results
 
 On **1×H100**, a pre-allocated KV cache with position-indexed writes improved throughput **7.74× at 2K context** versus no cache.
