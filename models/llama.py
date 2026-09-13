@@ -5,7 +5,7 @@ import json
 import time
 
 from transformers import AutoTokenizer
-from paged_kv_cache import PagedKVCache
+from engine.paged_kv_cache import PagedKVCache
 
 device = "mps"
 
@@ -83,7 +83,7 @@ class Attention(nn.Module):
         self.wv = nn.Linear(n_embd, n_heads * head_size, bias=False)
         self.wo = nn.Linear(n_heads * head_size, n_embd, bias=False)
 
-    def forward(self, x, freqs_cis, start_pos, mask, request_id, layer_id):
+    def forward(self, x, freqs_cis, start_pos, mask, request_id, layer_id, kv_cache):
         B, T, C = x.shape
 
         q = self.wq(x) # (B, T, 4096)
@@ -146,9 +146,9 @@ class AttentionBlock(nn.Module):
         self.attention_norm = RMSNorm()
         self.ffn_norm = RMSNorm()
 
-    def forward(self, x, freqs_cis, start_pos, mask, request_id, layer_id):
+    def forward(self, x, freqs_cis, start_pos, mask, request_id, layer_id, kv_cache):
         # residual connections
-        x = x + self.attention(self.attention_norm(x), freqs_cis, start_pos, mask, request_id, layer_id)
+        x = x + self.attention(self.attention_norm(x), freqs_cis, start_pos, mask, request_id, layer_id, kv_cache)
         x = x + self.feed_forward(self.ffn_norm(x))
         return x
 
@@ -169,7 +169,7 @@ class Transformer(nn.Module):
         self.output = nn.Linear(n_embd, tokenizer.vocab_size, bias=False)
     
     @torch.inference_mode()
-    def forward(self, input, start_pos, request_id):
+    def forward(self, input, start_pos, request_id, kv_cache):
         B, T = input.shape
 
         tok_emb = self.tok_embeddings(input)
@@ -186,7 +186,7 @@ class Transformer(nn.Module):
             mask = torch.cat([prefix_mask, chunk_mask], dim=-1)
 
         for layer_id, layer in enumerate(self.layers):
-            tok_emb = layer(tok_emb, freqs_cis, start_pos, mask, request_id, layer_id)
+            tok_emb = layer(tok_emb, freqs_cis, start_pos, mask, request_id, layer_id, kv_cache)
 
         tok_emb = self.norm(tok_emb)
         final = self.output(tok_emb)
@@ -235,7 +235,7 @@ if __name__ == "__main__":
         chunk_size = min(prefill_chunk_size, remaining_tokens)
         chunk = input_tokens[:, tokens_processed:tokens_processed + chunk_size]
 
-        logits = model(chunk, tokens_processed, request_id)
+        logits = model(chunk, tokens_processed, request_id, kv_cache)
 
         tokens_processed += chunk_size
 
@@ -249,7 +249,7 @@ if __name__ == "__main__":
     max_tokens = 2048
     # alr generated 1 token
     for _ in range(max_tokens - 1):
-        logits = model(next_token, start_pos, request_id)
+        logits = model(next_token, start_pos, request_id, kv_cache)
         logits = logits[:, -1, :]
         probs = F.softmax(logits, dim=-1)
         next_token = torch.multinomial(probs, num_samples=1)

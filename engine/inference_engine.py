@@ -1,13 +1,15 @@
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
-
 from typing import List
 
+import torch
+import torch.nn.functional as F
 from transformers import AutoTokenizer
-from llama import Transformer, device, head_size, max_batch_size, n_heads, n_layers
-from paged_kv_cache import PagedKVCache
-from request import InferenceRequest
+
+from engine.paged_kv_cache import PagedKVCache
+from engine.request import InferenceRequest
+from models.llama import Transformer, device, head_size, max_batch_size, n_heads, n_layers
 
 class FinishReason(Enum):
     EOS = 1
@@ -55,22 +57,25 @@ class InferenceEngine:
         """Process one prompt chunk; sample the first output token
         if prefill finishes."""
         # batched prefill
-        tokens_processed = 0
-        while tokens_processed < len(request.prompt):
+        tokens_processed = request.num_cached
+        if tokens_processed < len(request.prompt):
             remaining_tokens = len(request.prompt) - tokens_processed
             chunk_size = min(chunk_size, remaining_tokens)
-            chunk = request.prompt[:, tokens_processed:tokens_processed + chunk_size]
+            chunk = request.prompt[tokens_processed:tokens_processed + chunk_size]
+            chunk = torch.tensor(chunk, dtype=torch.long, device=device).unsqueeze(0)
 
-            logits = self.model(chunk, tokens_processed, request.id)
+            logits = self.model(chunk, tokens_processed, request.id, self.kv_cache)
 
             tokens_processed += chunk_size
+            request.num_cached = tokens_processed
 
-        logits = logits[:, -1, :]
-        probs = F.softmax(logits, dim=-1)
-        next_token = torch.multinomial(probs, num_samples=1)
-        generated = torch.cat((input_tokens, next_token), dim=1)
-
-        start_pos = prompt_length
+        # prefill finished, sample first output
+        if request.num_cached >= len(request.prompt):
+            logits = logits[:, -1, :]
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            token_id = next_token.item()
+            request.generated_tokens.append(token_id)
 
     def decode(self, requests: List[InferenceRequest]) -> None:
         """Process one pending token per request in a batch,
