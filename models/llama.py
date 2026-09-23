@@ -46,16 +46,14 @@ def precompute_complex_exponential_freqs(head_size, end, theta = 10000.0):
     return freqs_cis
 
 # allow pytorch broadcasts
-def reshape_for_broadcast(freqs_cis, x):
-    ndim = x.ndim
-    shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)]
-    return freqs_cis.view(*shape)
+def reshape_for_broadcast(freqs_cis):
+    return freqs_cis.unsqueeze(2)
 
 def apply_rope(query, key, freqs_cis):
     q = torch.view_as_complex(query.float().reshape(*query.shape[:-1], -1, 2))
     k = torch.view_as_complex(key.float().reshape(*key.shape[:-1], -1, 2))
     # allow pytorch to broadcast the tensor
-    freqs_cis = reshape_for_broadcast(freqs_cis, q) 
+    freqs_cis = reshape_for_broadcast(freqs_cis) 
     # perform rotation
     q_out = torch.view_as_real(q * freqs_cis).flatten(3)
     k_out = torch.view_as_real(k * freqs_cis).flatten(3)
@@ -83,7 +81,7 @@ class Attention(nn.Module):
         self.wv = nn.Linear(n_embd, n_heads * head_size, bias=False)
         self.wo = nn.Linear(n_heads * head_size, n_embd, bias=False)
 
-    def forward(self, x, freqs_cis, start_pos, mask, request_id, layer_id, kv_cache):
+    def forward(self, x, freqs_cis, start_positions, mask, request_ids, layer_id, kv_cache):
         B, T, C = x.shape
 
         q = self.wq(x) # (B, T, 4096)
@@ -98,9 +96,10 @@ class Attention(nn.Module):
         query, key = apply_rope(query, key, freqs_cis=freqs_cis)
 
         # cache token pos (T should be 1 for kv cache aware inference)
-        kv_cache.write(request_id, start_pos, layer_id, key, value)
+        kv_cache.write(request_ids, start_positions, layer_id, key, value)
 
-        key, value = kv_cache.read(request_id, layer_id, start_pos + T)
+        end_positions = [start_positions[i] + T for i in range(len(start_positions))]
+        key, value = kv_cache.read(request_ids, end_positions, layer_id)
 
         query = query.transpose(1, 2) # (B, 32, T, 128)
         key = key.transpose(1, 2)
@@ -146,9 +145,9 @@ class AttentionBlock(nn.Module):
         self.attention_norm = RMSNorm()
         self.ffn_norm = RMSNorm()
 
-    def forward(self, x, freqs_cis, start_pos, mask, request_id, layer_id, kv_cache):
+    def forward(self, x, freqs_cis, start_positions, mask, request_ids, layer_id, kv_cache):
         # residual connections
-        x = x + self.attention(self.attention_norm(x), freqs_cis, start_pos, mask, request_id, layer_id, kv_cache)
+        x = x + self.attention(self.attention_norm(x), freqs_cis, start_positions, mask, request_ids, layer_id, kv_cache)
         x = x + self.feed_forward(self.ffn_norm(x))
         return x
 
@@ -169,24 +168,24 @@ class Transformer(nn.Module):
         self.output = nn.Linear(n_embd, tokenizer.vocab_size, bias=False)
     
     @torch.inference_mode()
-    def forward(self, input, start_pos, request_id, kv_cache):
+    def forward(self, input, start_positions, request_ids, kv_cache):
         B, T = input.shape
 
+        starts = torch.as_tensor(start_positions, dtype=torch.long, device=input.device)
+        offsets = torch.arange(T, device=input.device)
+
+        positions = starts[:, None] + offsets[None, :]
+        freqs_cis = self.freqs_cis[positions]
         tok_emb = self.tok_embeddings(input)
-        freqs_cis = self.freqs_cis[start_pos:start_pos + T]
 
-        mask = None
-        if T > 1:
-            # add cached tokens 
-            prefix_mask = torch.ones(T, start_pos, dtype=torch.bool, device=input.device)
-            # if performing prefill of more than 1 token
-            # dont let previous tokens look at future tokens
-            chunk_mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=input.device))
+        max_context_length = max(start_positions) + T
+        key_positions = torch.arange(max_context_length, device = input.device)
 
-            mask = torch.cat([prefix_mask, chunk_mask], dim=-1)
+        mask = key_positions[None, None, :] <= positions[:, :, None] # (B, T, max_context_length)
+        mask = mask.unsqueeze(1)
 
         for layer_id, layer in enumerate(self.layers):
-            tok_emb = layer(tok_emb, freqs_cis, start_pos, mask, request_id, layer_id, kv_cache)
+            tok_emb = layer(tok_emb, freqs_cis, start_positions, mask, request_ids, layer_id, kv_cache)
 
         tok_emb = self.norm(tok_emb)
         final = self.output(tok_emb)
@@ -230,12 +229,15 @@ if __name__ == "__main__":
 
     # batched prefill
     tokens_processed = 0
+    request_ids = [request_id]
+    start_positions = [tokens_processed]
     while tokens_processed < prompt_length:
+        start_positions = [tokens_processed]
         remaining_tokens = prompt_length - tokens_processed
         chunk_size = min(prefill_chunk_size, remaining_tokens)
         chunk = input_tokens[:, tokens_processed:tokens_processed + chunk_size]
 
-        logits = model(chunk, tokens_processed, request_id, kv_cache)
+        logits = model(chunk, start_positions, request_ids, kv_cache)
 
         tokens_processed += chunk_size
 
@@ -244,18 +246,19 @@ if __name__ == "__main__":
     next_token = torch.multinomial(probs, num_samples=1)
     generated = torch.cat((input_tokens, next_token), dim=1)
 
-    start_pos = prompt_length
+    start_positions = [prompt_length]
+    req_ids = [request_id]
 
-    max_tokens = 2048
+    max_tokens = 10
     # alr generated 1 token
     for _ in range(max_tokens - 1):
-        logits = model(next_token, start_pos, request_id, kv_cache)
+        logits = model(next_token, start_positions, req_ids, kv_cache)
         logits = logits[:, -1, :]
         probs = F.softmax(logits, dim=-1)
         next_token = torch.multinomial(probs, num_samples=1)
         generated = torch.cat((generated, next_token), dim=1)
 
-        start_pos += 1
+        start_positions[0] += 1
 
     torch.mps.synchronize()
     end = time.perf_counter()

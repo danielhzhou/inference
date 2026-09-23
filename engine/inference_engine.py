@@ -64,7 +64,7 @@ class InferenceEngine:
             chunk = request.prompt[tokens_processed:tokens_processed + chunk_size]
             chunk = torch.tensor(chunk, dtype=torch.long, device=device).unsqueeze(0)
 
-            logits = self.model(chunk, tokens_processed, request.id, self.kv_cache)
+            logits = self.model(chunk, [tokens_processed], [request.id], self.kv_cache)
 
             tokens_processed += chunk_size
             request.num_cached = tokens_processed
@@ -80,8 +80,30 @@ class InferenceEngine:
     def decode(self, requests: List[InferenceRequest]) -> None:
         """Process one pending token per request in a batch,
         then sample one new token per request."""
-        pass
+        if not requests:
+            return
+        
+        tokens = []
+        start_positions = []
+        request_ids = []
+        # indices in requests correspond to indices within the B dimension
+        for request in requests:
+            tokens.append([request.generated_tokens[-1]])
+            start_positions.append(request.num_cached)
+            request_ids.append(request.id)
+        
+        tokens = torch.tensor(tokens, dtype=torch.long, device=device)
 
+        logits = self.model(tokens, start_positions, request_ids, self.kv_cache)
+        logits = logits[:, -1, :]
+        probs = F.softmax(logits, dim=-1)
+        next_tokens = torch.multinomial(probs, num_samples=1) # [B, 1]
+
+        for idx, row in enumerate(next_tokens):
+            token_id = row.item()
+            requests[idx].generated_tokens.append(token_id)
+            requests[idx].num_cached += 1
+       
     # TODO: utilize padding or metadata passed to the transformer in order to 
     # process mixed prefill / decode instead of processing independently
     def step(self) -> None:
