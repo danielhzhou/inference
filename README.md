@@ -7,7 +7,7 @@ A from scratch **Llama 2 7B inference engine** in PyTorch, building toward an **
 - [x] Llama 2 7B inference
 - [x] KV cache + chunked prefill
 - [x] Paged KV allocation
-- [ ] Continuous batching + serving scheduler
+- [x] Continuous batching + serving scheduler
 - [ ] Paged attention kernel
 - [ ] Quantization
 - [ ] Speculative decoding
