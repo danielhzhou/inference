@@ -224,7 +224,7 @@ def benchmark(batches: list[int], contexts: list[int], dtype: str = "float16", w
     return report
 
 @app.local_entrypoint()
-def main(batches: str = "1,4,8", contexts: str = "128,512,2048", dtype: str = "float16", output: str = "paged_attention_results.json", warmup_ms: int = 25, rep_ms: int = 100, trials: int = 3, seed: int = 123):
+def main(batches: str = "1,4,8", contexts: str = "128,512,2048", dtype: str = "float16", output: str = "benchmarks/results/raw/paged_attention_h100_results.json", warmup_ms: int = 25, rep_ms: int = 100, trials: int = 3, seed: int = 123):
     def parse_sizes(value):
         sizes = list(dict.fromkeys(int(item.strip()) for item in value.split(",")))
         if not sizes or any(size < 1 for size in sizes):

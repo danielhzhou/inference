@@ -235,7 +235,7 @@ def benchmark(batches: list[int], contexts: list[int], new_tokens: int = 16, tri
     return report
 
 @app.local_entrypoint()
-def main(batches: str = "1,8", contexts: str = "128,2048", new_tokens: int = 16, trials: int = 3, output: str = "benchmarks/llama_full_h100_results.json"):
+def main(batches: str = "1,8", contexts: str = "128,2048", new_tokens: int = 16, trials: int = 3, output: str = "benchmarks/results/raw/llama_full_h100_results.json"):
     batch_list = list(dict.fromkeys(int(value.strip()) for value in batches.split(',')))
     context_list = list(dict.fromkeys(int(value.strip()) for value in contexts.split(',')))
     report = benchmark.remote(batch_list, context_list, new_tokens, trials)

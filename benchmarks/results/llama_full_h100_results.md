@@ -17,4 +17,4 @@ Only decode attention changed, through a benchmark adapter. Both versions used 3
 
 Generated tokens matched in every trial. Comparing logits on the same histories gave a maximum difference of 0.046875. The batch-1/128-token gain was small and varied across trials. The scheduler wasn't tested.
 
-[Raw data](llama_full_h100_results.json) / [Script](benchmark_llama_full_modal.py)
+[Raw data](raw/llama_full_h100_results.json) / [Script](../benchmark_llama_full_modal.py)

@@ -16,4 +16,4 @@ Used random K/V, shuffled pages, 32 heads, 128 dimensions per head, and 16 token
 
 The 21.58x result is for one attention call. Full-model decode reached 8.25x in the [generation test](llama_full_h100_results.md).
 
-[Raw data](paged_attention_h100_results.json) / [Script](benchmark_paged_attention_modal.py)
+[Raw data](raw/paged_attention_h100_results.json) / [Script](../benchmark_paged_attention_modal.py)
