@@ -2,3 +2,5 @@ venv/
 input.txt
 llama-2-7b/
 .DS_Store
+__pycache__/
+*.py[cod]
